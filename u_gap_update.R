@@ -17,7 +17,8 @@ rm(list = ls())
 Sys.setenv(LANG = "en")
 
 # Load packages
-library("tidyverse")     # Loading various pckgs, e.g. ggplot2, dplyr
+library("dplyr")         # Data treatment
+library("ggplot2")       # Graphs
 library("readxl")        # To load excel files into R
 library("blsR")          # To load data from BLS
 library("lubridate")     # Work with dates
