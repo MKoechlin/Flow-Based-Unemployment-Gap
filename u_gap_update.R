@@ -30,6 +30,8 @@ bls_set_key(
   filter(source == "BLS") %>% pull(key)
 )
 
+# Access the secret
+bls_api_key <- Sys.getenv("BLS_API")
 
 # Load data ---------------------------------------------------------------
 
