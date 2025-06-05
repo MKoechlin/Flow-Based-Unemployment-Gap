@@ -22,6 +22,7 @@ jobs:
           packages: |
             any::ggplot2
             any::dplyr
+            any::tidyr
             any::readxl
             any::lubridate
             any::zoo
