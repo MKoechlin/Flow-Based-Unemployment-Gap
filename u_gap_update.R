@@ -154,7 +154,7 @@ final_data <- final_data %>%
 
 # Save the dataset --------------------------------------------------------
 # Save as CSV
-write.csv(final_data %>% dplyr::select(date, u_gap_ma6) %>% rename(u_gap = u_gap_ma6),
+write.csv(final_data %>% dplyr::select(date, u_gap_ma6) %>% rename(u_gap = u_gap_ma6) %>% drop_na(),
           file = "output/Kharroubi_Koechlin_u_gap_data.csv", row.names = FALSE)
 
 
