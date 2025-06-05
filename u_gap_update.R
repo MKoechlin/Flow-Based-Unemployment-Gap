@@ -26,12 +26,8 @@ library("zoo")           # Work with dates
 # Set your API key (if used) (can be set-up here: https://www.bls.gov/developers/)
 bls_set_key(
   # REPLACE WITH YOUR BLS API KEY !
-  readxl::read_excel("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/UNI/PhD/Research/Research_projects/API_info.xlsx") %>%
-  filter(source == "BLS") %>% pull(key)
+  bls_api_key <- Sys.getenv("BLS_API")
 )
-
-# Access the secret
-bls_api_key <- Sys.getenv("BLS_API")
 
 # Load data ---------------------------------------------------------------
 
