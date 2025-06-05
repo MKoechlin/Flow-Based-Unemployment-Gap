@@ -17,7 +17,8 @@ rm(list = ls())
 Sys.setenv(LANG = "en")
 
 # Load packages
-library("dplyr")         # Data treatment
+library("dplyr")         # Code structure
+library("tidyr")         # Data treatment
 library("ggplot2")       # Graphs
 library("readxl")        # To load excel files into R
 library("blsR")          # To load data from BLS
