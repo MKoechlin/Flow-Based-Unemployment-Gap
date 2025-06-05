@@ -18,6 +18,7 @@ Sys.setenv(LANG = "en")
 
 # Load packages
 library("dplyr")         # Code structure
+library("tibble")
 library("tidyr")         # Data treatment
 library("ggplot2")       # Graphs
 library("readxl")        # To load excel files into R
