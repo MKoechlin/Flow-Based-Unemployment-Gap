@@ -1,0 +1,27 @@
+name: Automatic U-Gap Update
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Runs every Monday at 06:00 UTC
+  workflow_dispatch:      # Also allows manual trigger
+
+jobs:
+  update-u-gap:
+    runs-on: ubuntu-latest
+
+    env:
+      BLS_API: ${{ secrets.BLS_API }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Install packages
+        run: |
+          Rscript -e 'install.packages(c("tidyverse", "httr", "jsonlite", "lubridate"), repos = "https://cloud.r-project.org")'
+
+      - name: Run u_gap_update.R
+        run: Rscript u_gap_update.R
