@@ -38,13 +38,13 @@ jobs:
         run: Rscript u_gap_update.R
 
       - name: Commit and push updated output
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git pull
           git add output/*.csv output/*.png || echo "No files to add"
           git commit -m "Update unemployment gap data and graphs [automated]" || echo "No changes to commit"
-          git push origin HEAD
-        env:
-          # GitHub token for push access
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }} HEAD:main
+
