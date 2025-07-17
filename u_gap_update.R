@@ -1,11 +1,11 @@
 ##################################################################
 
-#' Code related to Enisse Kharroubi & Marius Koechlin 2025: Labour market floes and the Phillips curve
-#' Code uuthor Marius Koechlin
+#' Code related to Enisse Kharroubi & Marius Koechlin 2025: Labour market flows and the Phillips curve
+#' Code author: Marius Koechlin
 #' 
-#' This code file updates the unemployment gap measure introduce in the paper mentioned above.
+#' This code file updates the unemployment gap measure introduced in the paper mentioned above.
 #' 
-#' Last updated: 05.06.2025
+#' Last updated: 17.07.2025
 
 
 
@@ -154,7 +154,7 @@ final_data <- final_data %>%
 
 # Save the dataset --------------------------------------------------------
 # Save as CSV
-write.csv(final_data %>% dplyr::select(date, u_gap_ma6) %>% rename(u_gap = u_gap_ma6) %>% drop_na(),
+write.csv(final_data %>% dplyr::select(date, u_gap, u_gap_ma6) %>% rename(KK_u_gap = u_gap, KK_u_gap_ma6 = u_gap_ma6) %>% drop_na(),
           file = "output/Kharroubi_Koechlin_u_gap_data.csv", row.names = FALSE)
 
 
