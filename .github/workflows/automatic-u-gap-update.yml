@@ -31,10 +31,11 @@ jobs:
             any::lubridate
             any::zoo
             any::blsR
+            any::fredr
 
       - name: Run script
         env:
-          BLS_API: ${{ secrets.BLS_API }}
+          FRED_API: ${{ secrets.FRED_API }}
         run: Rscript u_gap_update.R
 
       - name: Commit and push updated output
