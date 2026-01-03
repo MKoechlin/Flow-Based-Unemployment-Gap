@@ -23,16 +23,21 @@ library("tidyr")         # Data treatment
 library("ggplot2")       # Graphs
 library("readxl")        # To load excel files into R
 library("blsR")          # To load data from BLS
+library("fredr")         # To load data from FRED
 library("lubridate")     # Work with dates
 library("zoo")           # Work with dates
 
-# Set your API key (if used) (can be set-up here: https://www.bls.gov/developers/)
-bls_set_key(
-  # REPLACE WITH YOUR BLS API KEY !
-  bls_api_key <- Sys.getenv("BLS_API")
+# Set your API key (if used) (can be set-up here: https://fred.stlouisfed.org/docs/api/api_key.html
+fredr_set_key(
+  # REPLACE WITH YOUR FRED API KEY !
+  frd_api_key <- Sys.getenv("FRED_API")
 )
 
 # Load data ---------------------------------------------------------------
+
+# Define date
+startdate <- as.Date("1990-01-01")
+enddate <- as.Date(today())
 
 ## Labour Market Flows
 #' The data can be downloaded here: https://fred.stlouisfed.org/release/tables?rid=334&eid=1147#snid=1189
@@ -41,62 +46,83 @@ bls_set_key(
 # Data on the data series names
 bls_lfs_id <- read.csv("rawdata/bls_lfs_id.csv")
 
-# Load the data using the BLS API
-bls_lfs_data <- get_n_series_table(series_ids = bls_lfs_id$series_id, api_key = bls_get_key(), 
-                   start_year = 1990, end_year = lubridate::year(today()),
-                   parse_values = TRUE) 
+# Load the data using the FRED API
+# Prepare dataframe
+lfs_data <- tibble(date = numeric(), value = numeric(), series_id = character())
 
-# Clean the data
-bls_lfs_data <- bls_lfs_data %>%
-  mutate(month = as.numeric(gsub("M", "", period)),
-         date = as.Date(paste0(year, "-", month, "-01"))) %>%
-  relocate(year, date, month) %>% dplyr::select(-c(year, period, month)) %>%
-  pivot_longer(- date, names_to = "series_id", values_to = "flow_ths_pers")
+# Loop over each of the nine transitions
+for (i in bls_lfs_id$series_id) {
+  flow_i <- 
+    fredr::fredr(i, observation_start = startdate, observation_end = enddate, frequency = "m", units = "lin") %>% 
+    dplyr::select(date, value) %>% mutate(series_id = i)
+  lfs_data <- rbind(lfs_data, flow_i)
+}
+
+# Clean data
+lfs_data <- lfs_data %>%
+  rename(flow_ths_pers = value)
 
 # Join data with series names
-bls_lfs_data <- bls_lfs_data %>%
+lfs_data <- lfs_data %>%
   left_join(bls_lfs_id, join_by("series_id"))
 
 
-## Stock unemployment rate
+## Additional data, such as stock unemployment rate
 #' The data can be downloaded from the BLS website: https://www.bls.gov/cps/lfcharacteristics.htm
 #' Or an API can be used (either from FRED or BLS).
 
 # Data on the data series names
 bls_lm_id <- read.csv("rawdata/bls_lm_id.csv")
 
-# Load the data using the BLS API
-bls_lm_data <- get_n_series_table(series_ids = bls_lm_id$series_id, api_key = bls_get_key(), 
-                                   start_year = 1990, end_year = lubridate::year(today()),
-                                   parse_values = TRUE) 
+# Load the data using the FRED API
+lm_data <- as_tibble(
+  rbind(
+    # Unemployment Level (UNEMPLOY) [BLS: LNS13000000]
+    fredr::fredr("UNEMPLOY", observation_start = startdate, observation_end = enddate, frequency = "m", units = "lin") %>%
+      dplyr::select(date, value) %>% mutate(series_id = "LNS13000000"),
+    # Unemployment Rate (UNRATE) [BLS: LNS14000000]
+    fredr::fredr("UNRATE", observation_start = startdate, observation_end = enddate, frequency = "m", units = "lin") %>%
+      dplyr::select(date, value) %>% mutate(series_id = "LNS14000000"),
+    # Population Level (CNP16OV) [BLS: LNU00000000]
+    fredr::fredr("CNP16OV", observation_start = startdate, observation_end = enddate, frequency = "m", units = "lin") %>%
+      dplyr::select(date, value) %>% mutate(series_id = "LNU00000000"),
+    # Consumer Price Index for All Urban Consumers: All Items Less Food and Energy in U.S. City Average (CPILFESL) [BLS: CUSR0000SA0L1E]
+    fredr::fredr("CPILFESL", observation_start = startdate, observation_end = enddate, frequency = "m", units = "lin") %>%
+      dplyr::select(date, value) %>% mutate(series_id = "CUSR0000SA0L1E")
+  )
+)
 
-# Clean the data
-bls_lm_data <- bls_lm_data %>%
-  mutate(month = as.numeric(gsub("M", "", period)),
-         date = as.Date(paste0(year, "-", month, "-01"))) %>%
-  relocate(year, date, month) %>% dplyr::select(-c(year, period, month)) %>%
-  pivot_longer(- date, names_to = "series_id", values_to = "value")
+# Clean data
+lm_data <- lm_data %>%
+  mutate(date = as.Date(date),
+         value = as.numeric(value))
 
 # Join data with series names
-bls_lm_data <- bls_lm_data %>%
+lm_data <- lm_data %>%
   left_join(bls_lm_id, join_by("series_id"))
+
+# Add name for CPI
+lm_data <- lm_data %>%
+  mutate(series_name_short = ifelse(series_id == "CUSR0000SA0L1E", "cpi_core_idx", series_name_short))
 
 
 # Data treatment ----------------------------------------------------------
 ## Labour Market Flows
 # Prepare the flows and calculate the monthly transition probabilities
-bls_lfs_data <- bls_lfs_data %>%
+lfs_data <- lfs_data %>%
   group_by(date, t0) %>%
   mutate(total_flow = sum(flow_ths_pers)) %>% ungroup() %>%
   mutate(trans_prob = flow_ths_pers / total_flow) %>%
   dplyr::select(date, t0, t1, transition, flow_ths_pers, total_flow, trans_prob)
 
-## Stock unemployment rate
+## Additional data
 # Adjust dataset & calculate the unemployment rate as a share of the working age population
-bls_lm_data <- bls_lm_data %>%
+lm_data <- lm_data %>%
   dplyr::select(date, series_name_short, value) %>%
   pivot_wider(names_from = series_name_short, values_from = value) %>%
-  mutate(u_rate = unemployed / population * 100)
+  mutate(u_rate = unemployed / population * 100) %>%
+  # Calculate the core CPI inflation rate (yoy)
+  mutate(cpi_core_yoy = (log(cpi_core_idx) - log(dplyr::lag(cpi_core_idx, 12))) * 100)
 
 
 
@@ -105,10 +131,10 @@ bls_lm_data <- bls_lm_data %>%
 flow_u_data <- tibble(date = numeric(), flow_u = numeric())
 
 # Start loop
-for (date_t in unique(bls_lfs_data$date)) {
+for (date_t in unique(lfs_data$date)) {
   
   # Prepare p matrix
-  p_matrix <- bls_lfs_data %>% 
+  p_matrix <- lfs_data %>% 
     dplyr::select(c(date, transition, t0, t1, trans_prob)) %>%
     filter(date == date_t) %>% dplyr::select(-c(date, transition)) %>%
     pivot_wider(names_from = t1, values_from = trans_prob) %>% 
@@ -142,7 +168,7 @@ flow_u_data <- flow_u_data %>%
 # Combine the data & calculate the gap ------------------------------------
 # Combine data
 final_data <- 
-  bls_lm_data %>% dplyr::select(date, u_rate) %>%
+  lm_data %>% dplyr::select(date, u_rate, cpi_core_yoy) %>%
   left_join(flow_u_data, by = "date") 
 
 # Calculate the unemployment gap
@@ -169,14 +195,15 @@ final_data %>%
   geom_rect(xmin = as.Date("2020-03-01"), xmax = as.Date("2020-04-30"), ymin = -Inf, ymax = Inf, fill = "gray90", alpha = 0.02) +
   geom_line(aes(y = u_rate_ma6, color = "Stock-based unemployment rate")) +
   geom_line(aes(y = flow_u_ma6, color = "Flow-based unemployment rate")) +
-  scale_color_manual(values = c("Stock-based unemployment rate" = "darkblue", 
-                                 "Flow-based unemployment rate" = "darkred"),
+  scale_color_manual(values = c("Stock-based unemployment rate" = "#58078c", 
+                                 "Flow-based unemployment rate" = "#aa332f"),
                      name = "") +
-  labs(title = "Flow-, and stock-based unemployment",
-       x = "Date", y = "Percentage") +
-  theme_minimal() + theme(legend.position = "bottom")
+  labs(title = "Flow-, and stock-based unemployment", x = "", y = "Percentage") +
+  scale_x_date(breaks = seq(as.Date("1990-01-01"), max(as.Date("2025-12-01"), na.rm = TRUE), by = "5 years"), date_labels = "%Y") +
+  theme_minimal(base_family = "Palatino", base_size = 20) +
+  theme(legend.position = "bottom", legend.margin=margin(-5,0,5,0), legend.box.spacing = unit(1, "pt"))
 # Save the plot
-ggsave("output/stock_flow_u_rate.png", width = 22, height = 15, units = "cm")
+ggsave("output/stock_flow_u_rate.png", width = 22, height = 12, units = "cm")
 
 # Plot the unemployment gap
 final_data %>%
@@ -190,10 +217,31 @@ final_data %>%
   geom_ribbon(aes(ymin = pmin((u_gap_ma6), 0), ymax = 0), fill = "#aa332f", alpha = 0.3) +
   geom_ribbon(aes(ymin = 0, ymax = pmax((u_gap_ma6), 0)), fill = "green3", alpha = 0.3) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "black", alpha = 0.5) +
-  labs(title = "Unemployment Gap (Flow-based - Stock-based)",
-       x = "Date", y = "Percentage points") +
-  theme_minimal()
-ggsave("output/u_gap.png", width = 22, height = 15, units = "cm")
+  labs(title = "Unemployment Gap (Flow-based - Stock-based)", x = "", y = "Percentage points") +
+  scale_x_date(breaks = seq(as.Date("1990-01-01"), max(as.Date("2025-12-01"), na.rm = TRUE), by = "5 years"), date_labels = "%Y") +
+  theme_minimal(base_family = "Palatino", base_size = 20) +
+  theme(legend.position = "bottom", legend.margin=margin(-5,0,5,0), legend.box.spacing = unit(1, "pt"))
+ggsave("output/u_gap.png", width = 22, height = 12, units = "cm")
+
+
+final_data %>%
+  ggplot(aes(x = date)) +
+  geom_rect(xmin = as.Date("1990-08-01"), xmax = as.Date("1991-03-31"), ymin = -Inf, ymax = Inf, fill = "gray90", alpha = 0.02) +
+  geom_rect(xmin = as.Date("2001-03-01"), xmax = as.Date("2001-11-30"), ymin = -Inf, ymax = Inf, fill = "gray90", alpha = 0.02) +
+  geom_rect(xmin = as.Date("2008-01-01"), xmax = as.Date("2009-06-30"), ymin = -Inf, ymax = Inf, fill = "gray90", alpha = 0.02) +
+  geom_rect(xmin = as.Date("2020-03-01"), xmax = as.Date("2020-04-30"), ymin = -Inf, ymax = Inf, fill = "gray90", alpha = 0.02) +
+  geom_line(aes(y = dplyr::lead(cpi_core_yoy, 12), color = "1-year ahead Core CPI (lhs)")) +
+  geom_line(aes(y = (u_gap_ma6 * 4) + 2, color = "Unemployment gap (rhs)")) +
+  scale_color_manual(name = "", values = c("Unemployment gap (rhs)" = "#aa332f", "1-year ahead Core CPI (lhs)" = "#58078c")) +
+  labs(x = "", y = "Percentage", title = "Core CPI inflation and the unemployment gap") +  
+  scale_x_date(breaks = seq(as.Date("1990-01-01"), max(as.Date("2025-12-01"), na.rm = TRUE), by = "5 years"), date_labels = "%Y") +
+  scale_y_continuous(breaks = scales::breaks_extended(n = 6),
+                     sec.axis = sec_axis(~., name = "Percentage points", labels = function(x) (x - 2)/4,
+                                         breaks = function(lims) unique(c(0 * 4 + 2, scales::breaks_extended(n = 6)(lims))) )) +
+  theme_minimal(base_family = "Palatino", base_size = 20) +
+  theme(legend.position = "bottom", legend.margin=margin(-5,0,5,0), legend.box.spacing = unit(1, "pt"))
+ggsave("output/core_cpi_u_gap.png", width = 22, height = 12, units = "cm")
+
 
 # Summary statistics of the gap
 final_data %>%
