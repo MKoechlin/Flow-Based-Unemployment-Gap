@@ -5,5 +5,5 @@ The R file **u_gap_update.R** contains the script to calculate the gap, and prod
 
 The file ***Kharroubi_Koechlin_u_gap_data.csv*** in the output folder contains the unemployment gap as described in our paper. There are two variables - *KK_u_gap* and *KK_u_gap_ma6* - which are the Kharroubi-Koechlin unemployment gap and the 6-month backward looking moving average of that gap (which is used in the paper).
 
-### Notes:
+#### Notes:
 - October and Noveber 2025 data is missing due to missing CPS labor force flows data. 
